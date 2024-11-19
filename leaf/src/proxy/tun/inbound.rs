@@ -8,7 +8,7 @@ use protobuf::Message;
 use tokio::sync::mpsc::channel as tokio_channel;
 use tokio::sync::mpsc::{Receiver as TokioReceiver, Sender as TokioSender};
 use tracing::{debug, error, info, trace, warn};
-use tun::{self, TunPacket};
+use tun::{self};
 
 use crate::{
     app::dispatcher::Dispatcher,
@@ -184,7 +184,7 @@ pub fn new(
         cfg.name(settings.name)
             .address(settings.address)
             .destination(settings.gateway)
-            .mtu(settings.mtu);
+            .mtu(settings.mtu as u16);
 
         #[cfg(not(any(target_arch = "mips", target_arch = "mips64")))]
         {
@@ -237,7 +237,7 @@ pub fn new(
             while let Some(pkt) = stack_stream.next().await {
                 match pkt {
                     Ok(pkt) => {
-                        if let Err(e) = tun_sink.send(TunPacket::new(pkt)).await {
+                        if let Err(e) = tun_sink.send(pkt).await {
                             // TODO Return the error
                             error!("Sending packet to TUN failed: {}", e);
                             return;
@@ -256,7 +256,7 @@ pub fn new(
             while let Some(pkt) = tun_stream.next().await {
                 match pkt {
                     Ok(pkt) => {
-                        if let Err(e) = stack_sink.send(pkt.into_bytes().into()).await {
+                        if let Err(e) = stack_sink.send(pkt.into()).await {
                             error!("Sending packet to NetStack failed: {}", e);
                             return;
                         }

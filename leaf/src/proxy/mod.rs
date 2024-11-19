@@ -19,7 +19,7 @@ use tracing::debug;
 use std::os::unix::io::{AsFd, AsRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, AsSocket};
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", target_env = "ohos"))]
 use {
     std::os::unix::io::RawFd, tokio::io::AsyncReadExt, tokio::io::AsyncWriteExt,
     tokio::net::UnixStream, tracing::trace,
@@ -152,6 +152,30 @@ async fn protect_socket(fd: RawFd) -> io::Result<()> {
                 io::ErrorKind::Other,
                 format!("failed to protect outbound socket {}", fd),
             ));
+        }
+        return Ok(());
+    }
+    Ok(())
+}
+
+#[cfg(target_env = "ohos")]
+async fn protect_socket(fd: RawFd) -> io::Result<()> {
+    if let Some(addr) = &*option::SOCKET_PROTECT_SERVER {
+        let mut stream = TcpStream::connect(addr).await?;
+        stream.write_i32(fd as i32).await?;
+        if stream.read_i32().await? != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                format!("failed to protect outbound socket {}", fd),
+            ));
+        }
+        return Ok(());
+    }
+    if !option::SOCKET_PROTECT_PATH.is_empty() {
+        let mut stream = UnixStream::connect(&*option::SOCKET_PROTECT_PATH).await?;
+        stream.write_i32(fd as i32).await?;
+        if stream.read_i32().await? != 0 {
+            return Ok(())
         }
         return Ok(());
     }
@@ -307,7 +331,7 @@ pub async fn new_udp_socket(indicator: &SocketAddr) -> io::Result<UdpSocket> {
 
     bind_socket(&socket, indicator).await?;
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_env = "ohos"))]
     protect_socket(socket.as_raw_fd()).await?;
 
     UdpSocket::from_std(socket.into())
@@ -350,7 +374,7 @@ async fn tcp_dial_task(dial_addr: SocketAddr) -> io::Result<DialResult> {
 
     bind_socket(&socket, &dial_addr).await?;
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_env = "ohos"))]
     protect_socket(socket.as_raw_fd()).await?;
 
     debug!("tcp dialing {}", &dial_addr);

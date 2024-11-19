@@ -27,6 +27,11 @@ use crate::app::{stat_manager::StatManager, SyncStatManager};
 #[cfg(feature = "api")]
 use crate::app::api::api_server::ApiServer;
 
+#[cfg(target_env = "ohos")]
+use ohos_hilog_binding::hilog_debug;
+#[cfg(target_env = "ohos")]
+use ohos_hilog_binding::LogOptions;
+
 pub mod app;
 pub mod common;
 pub mod config;
@@ -35,7 +40,7 @@ pub mod proxy;
 pub mod session;
 pub mod util;
 
-#[cfg(any(target_os = "ios", target_os = "macos", target_os = "android"))]
+#[cfg(any(target_os = "ios", target_os = "macos", target_os = "android", target_env ="ohos"))]
 pub mod mobile;
 
 #[cfg(all(feature = "inbound-tun", any(target_os = "macos", target_os = "linux")))]
